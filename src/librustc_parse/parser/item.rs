@@ -648,7 +648,7 @@ impl<'a> Parser<'a> {
         Ok((Ident::invalid(), item_kind, Some(attrs)))
     }
 
-    fn parse_impl_body(&mut self) -> PResult<'a, (Vec<ImplItem>, Vec<Attribute>)> {
+    fn parse_impl_body(&mut self) -> PResult<'a, (Vec<P<ImplItem>>, Vec<Attribute>)> {
         self.expect(&token::OpenDelim(token::Brace))?;
         let attrs = self.parse_inner_attributes()?;
 
@@ -670,7 +670,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses an impl item.
-    pub fn parse_impl_item(&mut self, at_end: &mut bool) -> PResult<'a, ImplItem> {
+    pub fn parse_impl_item(&mut self, at_end: &mut bool) -> PResult<'a, P<ImplItem>> {
         maybe_whole!(self, NtImplItem, |x| x);
         let attrs = self.parse_outer_attributes()?;
         let mut unclosed_delims = vec![];
@@ -685,7 +685,7 @@ impl<'a> Parser<'a> {
         if !item.attrs.iter().any(|attr| attr.style == AttrStyle::Inner) {
             item.tokens = Some(tokens);
         }
-        Ok(item)
+        Ok(P(item))
     }
 
     fn parse_impl_item_(
@@ -858,7 +858,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses the items in a trait declaration.
-    pub fn parse_trait_item(&mut self, at_end: &mut bool) -> PResult<'a, TraitItem> {
+    pub fn parse_trait_item(&mut self, at_end: &mut bool) -> PResult<'a, P<TraitItem>> {
         maybe_whole!(self, NtTraitItem, |x| x);
         let attrs = self.parse_outer_attributes()?;
         let mut unclosed_delims = vec![];
@@ -872,7 +872,7 @@ impl<'a> Parser<'a> {
         if !item.attrs.iter().any(|attr| attr.style == AttrStyle::Inner) {
             item.tokens = Some(tokens);
         }
-        Ok(item)
+        Ok(P(item))
     }
 
     fn parse_trait_item_(
@@ -1123,7 +1123,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses a foreign item.
-    pub fn parse_foreign_item(&mut self, extern_sp: Span) -> PResult<'a, ForeignItem> {
+    pub fn parse_foreign_item(&mut self, extern_sp: Span) -> PResult<'a, P<ForeignItem>> {
         maybe_whole!(self, NtForeignItem, |ni| ni);
 
         let attrs = self.parse_outer_attributes()?;
@@ -1173,7 +1173,7 @@ impl<'a> Parser<'a> {
 
         match self.parse_assoc_macro_invoc("extern", Some(&visibility), &mut false)? {
             Some(mac) => {
-                Ok(
+                Ok(P(
                     ForeignItem {
                         ident: Ident::invalid(),
                         span: lo.to(self.prev_span),
@@ -1183,7 +1183,7 @@ impl<'a> Parser<'a> {
                         kind: ForeignItemKind::Macro(mac),
                         tokens: None,
                     }
-                )
+                ))
             }
             None => {
                 if !attrs.is_empty()  {
@@ -1198,14 +1198,14 @@ impl<'a> Parser<'a> {
     /// Parses a static item from a foreign module.
     /// Assumes that the `static` keyword is already parsed.
     fn parse_item_foreign_static(&mut self, vis: ast::Visibility, lo: Span, attrs: Vec<Attribute>)
-                                 -> PResult<'a, ForeignItem> {
+                                 -> PResult<'a, P<ForeignItem>> {
         let mutbl = self.parse_mutability();
         let ident = self.parse_ident()?;
         self.expect(&token::Colon)?;
         let ty = self.parse_ty()?;
         let hi = self.token.span;
         self.expect_semi()?;
-        Ok(ForeignItem {
+        Ok(P(ForeignItem {
             ident,
             attrs,
             kind: ForeignItemKind::Static(ty, mutbl),
@@ -1213,18 +1213,18 @@ impl<'a> Parser<'a> {
             span: lo.to(hi),
             vis,
             tokens: None,
-        })
+        }))
     }
 
     /// Parses a type from a foreign module.
     fn parse_item_foreign_type(&mut self, vis: ast::Visibility, lo: Span, attrs: Vec<Attribute>)
-                             -> PResult<'a, ForeignItem> {
+                             -> PResult<'a, P<ForeignItem>> {
         self.expect_keyword(kw::Type)?;
 
         let ident = self.parse_ident()?;
         let hi = self.token.span;
         self.expect_semi()?;
-        Ok(ast::ForeignItem {
+        Ok(P(ast::ForeignItem {
             ident,
             attrs,
             kind: ForeignItemKind::Ty,
@@ -1232,7 +1232,7 @@ impl<'a> Parser<'a> {
             span: lo.to(hi),
             vis,
             tokens: None,
-        })
+        }))
     }
 
     fn is_static_global(&mut self) -> bool {
@@ -1813,7 +1813,7 @@ impl<'a> Parser<'a> {
         lo: Span,
         attrs: Vec<Attribute>,
         extern_sp: Span,
-    ) -> PResult<'a, ForeignItem> {
+    ) -> PResult<'a, P<ForeignItem>> {
         self.expect_keyword(kw::Fn)?;
         let (ident, decl, generics) = self.parse_fn_sig(ParamCfg {
             is_self_allowed: false,
@@ -1822,7 +1822,7 @@ impl<'a> Parser<'a> {
         })?;
         let span = lo.to(self.token.span);
         self.parse_semi_or_incorrect_foreign_fn_body(&ident, extern_sp)?;
-        Ok(ast::ForeignItem {
+        Ok(P(ast::ForeignItem {
             ident,
             attrs,
             kind: ForeignItemKind::Fn(decl, generics),
@@ -1830,7 +1830,7 @@ impl<'a> Parser<'a> {
             span,
             vis,
             tokens: None,
-        })
+        }))
     }
 
     /// Parses a method or a macro invocation in a trait impl.

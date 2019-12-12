@@ -504,13 +504,13 @@ impl<'a> TraitDef<'a> {
                            type_ident: Ident,
                            generics: &Generics,
                            field_tys: Vec<P<ast::Ty>>,
-                           methods: Vec<ast::ImplItem>)
+                           methods: Vec<P<ast::ImplItem>>)
                            -> P<ast::Item> {
         let trait_path = self.path.to_path(cx, self.span, type_ident, generics);
 
         // Transform associated types from `deriving::ty::Ty` into `ast::ImplItem`
         let associated_types = self.associated_types.iter().map(|&(ident, ref type_def)| {
-            ast::ImplItem {
+            P(ast::ImplItem {
                 id: ast::DUMMY_NODE_ID,
                 span: self.span,
                 ident,
@@ -521,7 +521,7 @@ impl<'a> TraitDef<'a> {
                 kind: ast::ImplItemKind::TyAlias(
                     type_def.to_ty(cx, self.span, type_ident, generics)),
                 tokens: None,
-            }
+            })
         });
 
         let Generics { mut params, mut where_clause, span } = self.generics
@@ -910,7 +910,7 @@ impl<'a> MethodDef<'a> {
                      explicit_self: Option<ast::ExplicitSelf>,
                      arg_types: Vec<(Ident, P<ast::Ty>)>,
                      body: P<Expr>)
-                     -> ast::ImplItem {
+                     -> P<ast::ImplItem> {
         // Create the generics that aren't for `Self`.
         let fn_generics = self.generics.to_generics(cx, trait_.span, type_ident, generics);
 
@@ -948,7 +948,7 @@ impl<'a> MethodDef<'a> {
         };
 
         // Create the method.
-        ast::ImplItem {
+        P(ast::ImplItem {
             id: ast::DUMMY_NODE_ID,
             attrs: self.attributes.clone(),
             generics: fn_generics,
@@ -958,7 +958,7 @@ impl<'a> MethodDef<'a> {
             ident: method_ident,
             kind: ast::ImplItemKind::Method(sig, body_block),
             tokens: None,
-        }
+        })
     }
 
     /// ```

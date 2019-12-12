@@ -155,13 +155,13 @@ ast_fragments! {
     Items(SmallVec<[P<ast::Item>; 1]>) {
         "item"; many fn flat_map_item; fn visit_item; fn make_items;
     }
-    TraitItems(SmallVec<[ast::TraitItem; 1]>) {
+    TraitItems(SmallVec<[P<ast::TraitItem>; 1]>) {
         "trait item"; many fn flat_map_trait_item; fn visit_trait_item; fn make_trait_items;
     }
-    ImplItems(SmallVec<[ast::ImplItem; 1]>) {
+    ImplItems(SmallVec<[P<ast::ImplItem>; 1]>) {
         "impl item"; many fn flat_map_impl_item; fn visit_impl_item; fn make_impl_items;
     }
-    ForeignItems(SmallVec<[ast::ForeignItem; 1]>) {
+    ForeignItems(SmallVec<[P<ast::ForeignItem>; 1]>) {
         "foreign item";
         many fn flat_map_foreign_item;
         fn visit_foreign_item;
@@ -536,16 +536,13 @@ impl<'a, 'b> MacroExpander<'a, 'b> {
                 Annotatable::Item(cfg.flat_map_item(item).pop().unwrap())
             }
             Annotatable::TraitItem(item) => {
-                Annotatable::TraitItem(
-                    item.map(|item| cfg.flat_map_trait_item(item).pop().unwrap()))
+                Annotatable::TraitItem(cfg.flat_map_trait_item(item).pop().unwrap())
             }
             Annotatable::ImplItem(item) => {
-                Annotatable::ImplItem(item.map(|item| cfg.flat_map_impl_item(item).pop().unwrap()))
+                Annotatable::ImplItem(cfg.flat_map_impl_item(item).pop().unwrap())
             }
             Annotatable::ForeignItem(item) => {
-                Annotatable::ForeignItem(
-                    item.map(|item| cfg.flat_map_foreign_item(item).pop().unwrap())
-                )
+                Annotatable::ForeignItem(cfg.flat_map_foreign_item(item).pop().unwrap())
             }
             Annotatable::Stmt(stmt) => {
                 Annotatable::Stmt(stmt.map(|stmt| cfg.flat_map_stmt(stmt).pop().unwrap()))
@@ -627,9 +624,9 @@ impl<'a, 'b> MacroExpander<'a, 'b> {
                     self.gate_proc_macro_attr_item(span, &item);
                     let item_tok = TokenTree::token(token::Interpolated(Lrc::new(match item {
                         Annotatable::Item(item) => token::NtItem(item),
-                        Annotatable::TraitItem(item) => token::NtTraitItem(item.into_inner()),
-                        Annotatable::ImplItem(item) => token::NtImplItem(item.into_inner()),
-                        Annotatable::ForeignItem(item) => token::NtForeignItem(item.into_inner()),
+                        Annotatable::TraitItem(item) => token::NtTraitItem(item),
+                        Annotatable::ImplItem(item) => token::NtImplItem(item),
+                        Annotatable::ForeignItem(item) => token::NtForeignItem(item),
                         Annotatable::Stmt(stmt) => token::NtStmt(stmt.into_inner()),
                         Annotatable::Expr(expr) => token::NtExpr(expr),
                         Annotatable::Arm(..)
@@ -1317,39 +1314,49 @@ impl<'a, 'b> MutVisitor for InvocationCollector<'a, 'b> {
         }
     }
 
-    fn flat_map_trait_item(&mut self, item: ast::TraitItem) -> SmallVec<[ast::TraitItem; 1]> {
+    fn flat_map_trait_item(&mut self, item: P<ast::TraitItem>) -> SmallVec<[P<ast::TraitItem>; 1]> {
         let mut item = configure!(self, item);
 
         let (attr, traits, after_derive) = self.classify_item(&mut item);
         if attr.is_some() || !traits.is_empty() {
-            return self.collect_attr(attr, traits, Annotatable::TraitItem(P(item)),
+            return self.collect_attr(attr, traits, Annotatable::TraitItem(item),
                                      AstFragmentKind::TraitItems, after_derive).make_trait_items()
         }
 
         match item.kind {
-            ast::TraitItemKind::Macro(mac) => {
-                let ast::TraitItem { attrs, span, .. } = item;
-                self.check_attributes(&attrs);
-                self.collect_bang(mac, span, AstFragmentKind::TraitItems).make_trait_items()
+            ast::TraitItemKind::Macro(..) => {
+                self.check_attributes(&item.attrs);
+                item.and_then(|item| match item.kind {
+                    ast::TraitItemKind::Macro(mac) => {
+                        self.collect_bang(mac, item.span, AstFragmentKind::TraitItems)
+                            .make_trait_items()
+                    }
+                    _ => unreachable!(),
+                })
             }
             _ => noop_flat_map_trait_item(item, self),
         }
     }
 
-    fn flat_map_impl_item(&mut self, item: ast::ImplItem) -> SmallVec<[ast::ImplItem; 1]> {
+    fn flat_map_impl_item(&mut self, item: P<ast::ImplItem>) -> SmallVec<[P<ast::ImplItem>; 1]> {
         let mut item = configure!(self, item);
 
         let (attr, traits, after_derive) = self.classify_item(&mut item);
         if attr.is_some() || !traits.is_empty() {
-            return self.collect_attr(attr, traits, Annotatable::ImplItem(P(item)),
+            return self.collect_attr(attr, traits, Annotatable::ImplItem(item),
                                      AstFragmentKind::ImplItems, after_derive).make_impl_items();
         }
 
         match item.kind {
-            ast::ImplItemKind::Macro(mac) => {
-                let ast::ImplItem { attrs, span, .. } = item;
-                self.check_attributes(&attrs);
-                self.collect_bang(mac, span, AstFragmentKind::ImplItems).make_impl_items()
+            ast::ImplItemKind::Macro(..) => {
+                self.check_attributes(&item.attrs);
+                item.and_then(|item| match item.kind {
+                    ast::ImplItemKind::Macro(mac) => {
+                        self.collect_bang(mac, item.span, AstFragmentKind::ImplItems)
+                            .make_impl_items()
+                    }
+                    _ => unreachable!(),
+                })
             }
             _ => noop_flat_map_impl_item(item, self),
         }
@@ -1375,24 +1382,30 @@ impl<'a, 'b> MutVisitor for InvocationCollector<'a, 'b> {
         noop_visit_foreign_mod(foreign_mod, self);
     }
 
-    fn flat_map_foreign_item(&mut self, mut foreign_item: ast::ForeignItem)
-        -> SmallVec<[ast::ForeignItem; 1]>
+    fn flat_map_foreign_item(&mut self, mut item: P<ast::ForeignItem>)
+        -> SmallVec<[P<ast::ForeignItem>; 1]>
     {
-        let (attr, traits, after_derive) = self.classify_item(&mut foreign_item);
+        let (attr, traits, after_derive) = self.classify_item(&mut item);
 
         if attr.is_some() || !traits.is_empty() {
-            return self.collect_attr(attr, traits, Annotatable::ForeignItem(P(foreign_item)),
+            return self.collect_attr(attr, traits, Annotatable::ForeignItem(item),
                                      AstFragmentKind::ForeignItems, after_derive)
                                      .make_foreign_items();
         }
 
-        if let ast::ForeignItemKind::Macro(mac) = foreign_item.kind {
-            self.check_attributes(&foreign_item.attrs);
-            return self.collect_bang(mac, foreign_item.span, AstFragmentKind::ForeignItems)
-                .make_foreign_items();
+        match item.kind {
+            ast::ForeignItemKind::Macro(..) => {
+                self.check_attributes(&item.attrs);
+                item.and_then(|item| match item.kind {
+                    ast::ForeignItemKind::Macro(mac) => {
+                        self.collect_bang(mac, item.span, AstFragmentKind::ForeignItems)
+                            .make_foreign_items()
+                    }
+                    _ => unreachable!(),
+                })
+            }
+            _ => noop_flat_map_foreign_item(item, self),
         }
-
-        noop_flat_map_foreign_item(foreign_item, self)
     }
 
     fn visit_item_kind(&mut self, item: &mut ast::ItemKind) {
