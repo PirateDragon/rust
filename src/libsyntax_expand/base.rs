@@ -137,23 +137,23 @@ impl Annotatable {
         }
     }
 
-    pub fn expect_trait_item(self) -> ast::TraitItem {
+    pub fn expect_trait_item(self) -> P<ast::TraitItem> {
         match self {
-            Annotatable::TraitItem(i) => i.into_inner(),
-            _ => panic!("expected Item")
+            Annotatable::TraitItem(i) => i,
+            _ => panic!("expected trait item")
         }
     }
 
-    pub fn expect_impl_item(self) -> ast::ImplItem {
+    pub fn expect_impl_item(self) -> P<ast::ImplItem> {
         match self {
-            Annotatable::ImplItem(i) => i.into_inner(),
-            _ => panic!("expected Item")
+            Annotatable::ImplItem(i) => i,
+            _ => panic!("expected impl item")
         }
     }
 
-    pub fn expect_foreign_item(self) -> ast::ForeignItem {
+    pub fn expect_foreign_item(self) -> P<ast::ForeignItem> {
         match self {
-            Annotatable::ForeignItem(i) => i.into_inner(),
+            Annotatable::ForeignItem(i) => i,
             _ => panic!("expected foreign item")
         }
     }
@@ -382,17 +382,17 @@ pub trait MacResult {
     }
 
     /// Creates zero or more impl items.
-    fn make_impl_items(self: Box<Self>) -> Option<SmallVec<[ast::ImplItem; 1]>> {
+    fn make_impl_items(self: Box<Self>) -> Option<SmallVec<[P<ast::ImplItem>; 1]>> {
         None
     }
 
     /// Creates zero or more trait items.
-    fn make_trait_items(self: Box<Self>) -> Option<SmallVec<[ast::TraitItem; 1]>> {
+    fn make_trait_items(self: Box<Self>) -> Option<SmallVec<[P<ast::TraitItem>; 1]>> {
         None
     }
 
     /// Creates zero or more items in an `extern {}` block
-    fn make_foreign_items(self: Box<Self>) -> Option<SmallVec<[ast::ForeignItem; 1]>> { None }
+    fn make_foreign_items(self: Box<Self>) -> Option<SmallVec<[P<ast::ForeignItem>; 1]>> { None }
 
     /// Creates a pattern.
     fn make_pat(self: Box<Self>) -> Option<P<ast::Pat>> {
@@ -468,9 +468,9 @@ make_MacEager! {
     expr: P<ast::Expr>,
     pat: P<ast::Pat>,
     items: SmallVec<[P<ast::Item>; 1]>,
-    impl_items: SmallVec<[ast::ImplItem; 1]>,
-    trait_items: SmallVec<[ast::TraitItem; 1]>,
-    foreign_items: SmallVec<[ast::ForeignItem; 1]>,
+    impl_items: SmallVec<[P<ast::ImplItem>; 1]>,
+    trait_items: SmallVec<[P<ast::TraitItem>; 1]>,
+    foreign_items: SmallVec<[P<ast::ForeignItem>; 1]>,
     stmts: SmallVec<[ast::Stmt; 1]>,
     ty: P<ast::Ty>,
 }
@@ -484,15 +484,15 @@ impl MacResult for MacEager {
         self.items
     }
 
-    fn make_impl_items(self: Box<Self>) -> Option<SmallVec<[ast::ImplItem; 1]>> {
+    fn make_impl_items(self: Box<Self>) -> Option<SmallVec<[P<ast::ImplItem>; 1]>> {
         self.impl_items
     }
 
-    fn make_trait_items(self: Box<Self>) -> Option<SmallVec<[ast::TraitItem; 1]>> {
+    fn make_trait_items(self: Box<Self>) -> Option<SmallVec<[P<ast::TraitItem>; 1]>> {
         self.trait_items
     }
 
-    fn make_foreign_items(self: Box<Self>) -> Option<SmallVec<[ast::ForeignItem; 1]>> {
+    fn make_foreign_items(self: Box<Self>) -> Option<SmallVec<[P<ast::ForeignItem>; 1]>> {
         self.foreign_items
     }
 
@@ -588,15 +588,15 @@ impl MacResult for DummyResult {
         Some(SmallVec::new())
     }
 
-    fn make_impl_items(self: Box<DummyResult>) -> Option<SmallVec<[ast::ImplItem; 1]>> {
+    fn make_impl_items(self: Box<DummyResult>) -> Option<SmallVec<[P<ast::ImplItem>; 1]>> {
         Some(SmallVec::new())
     }
 
-    fn make_trait_items(self: Box<DummyResult>) -> Option<SmallVec<[ast::TraitItem; 1]>> {
+    fn make_trait_items(self: Box<DummyResult>) -> Option<SmallVec<[P<ast::TraitItem>; 1]>> {
         Some(SmallVec::new())
     }
 
-    fn make_foreign_items(self: Box<Self>) -> Option<SmallVec<[ast::ForeignItem; 1]>> {
+    fn make_foreign_items(self: Box<Self>) -> Option<SmallVec<[P<ast::ForeignItem>; 1]>> {
         Some(SmallVec::new())
     }
 
